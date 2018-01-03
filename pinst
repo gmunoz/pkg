@@ -58,6 +58,9 @@ function create_index_file {
 		-path '/usr/misc' -prune -o \
 		-path '/sources' -prune -o \
 		-path '/tools' -prune -o \
+		-path '/pool1' -prune -o \
+		-path '/pool2' -prune -o \
+		-path '/run' -prune -o \
 		-print > ${INDEX_FILE}
 }
 
