@@ -1,0 +1,70 @@
+#!/usr/bin/perl -w
+
+##########################################################################
+# Author: Gabriel Munoz
+# Date: October 31, 2003
+# File: pdel
+# Usage: pdel <log_file_created_with_pinst>
+# Description: This program removes all the files on the system
+#   specified in the given log file, that can be created with pinst.
+##########################################################################
+
+use strict;
+
+if ($ARGV[0] eq "") {
+	print "pdel: error - specify a package log file for removal information\n";
+	exit 1;
+}
+
+my $file = $ARGV[0];
+my @list;
+
+# Read in the file and store in reverse order
+open (FILE, $file);
+while(<FILE>) {
+	chomp;
+	unshift(@list, $_);
+}
+close (FILE);
+
+# Lists of files/dirs that fail to remove
+my (@success, @fail, @dirs_fail, @files_fail);
+
+# Try and remove each file/directory in the list. If any items fail to
+# remove, then store in appropriate list.
+foreach (@list) {
+	if (-d $_) {  # Is a directory
+		if (!rmdir $_) {
+			push(@dirs_fail, $_);
+		} else {
+			push(@success, $_);
+		}
+	} else {  # Is a file
+		if (!unlink $_) {
+			push(@fail, $_);
+		} else {
+			push(@success, $_);
+		}
+	}
+}
+
+# If any directories failed to remove on first pass, try again
+foreach (@dirs_fail) {
+	if (!rmdir $_) {
+		push(@fail, $_);
+	} else {
+		push(@success, $_);
+	}
+}
+
+# Print out a listing of the files/dirs removed
+print "Successfully removed the following files/dirs:\n" if (@success > 0);
+foreach (@success) {
+	print "  $_\n";
+}
+
+# Print out a listing of files/dirs that failed to remove
+print "\nUnable to removed the following files/dirs:\n" if (@fail > 0);
+foreach (@fail) {
+	print "  $_\n";
+}

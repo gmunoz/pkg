@@ -1,0 +1,129 @@
+#!/bin/bash
+
+##########################################################################
+# Author: Gabriel Munoz
+# Date: October 22, 2003
+# File: pinst
+# Usage: pinst [-h] -c index_file_location
+# Description: This program logs to STDOUT all of the files that were
+#   installed to the system between the two log files that need to be
+#   created explicitly by the user. Run pinst -c <name> before and after
+#   configuring and installing a source package then run pinst -b
+#   <before_file> -a <after_file> and the new files will be displated to
+#   STDOUT.
+##########################################################################
+
+######################
+# Set up Environment #
+######################
+
+# setup any defaults or pre-processing commands
+ROOT_DIR="/"    # Modify this only if you need to change the root search dir
+INDEX_FILE=""   # Index file name for output
+AFTER_INDEX=""  # Index file created after installing a package
+BEFORE_INDEX="" # Index file created before installing a package
+
+#############
+# Functions #
+#############
+
+# A fuction to create an index file of the file systems current state.
+function create_index_file {
+	if [ "${INDEX_FILE}" == "" ]; then
+		echo "error: You must specify an output file for the index file"
+		usage
+		exit 1
+	fi
+
+	# Make sure not to clobber an existing file
+	if [ -f ${INDEX_FILE} ]; then
+		echo "error: '${INDEX_FILE}' index file already exists"
+		usage
+		exit 1
+	fi
+
+	find ${ROOT_DIR} \
+		-path '/proc' -prune -o \
+		-path '/sys' -prune -o \
+		-path '/media' -prune -o \
+		-path '/tmp' -prune -o \
+		-path '/root' -prune -o \
+		-path '/home' -prune -o \
+		-path '/mnt' -prune -o \
+		-path '/dev' -prune -o \
+		-path '/var' -prune -o \
+		-path '/usr/src' -prune -o \
+		-path '/usr/tmp' -prune -o \
+		-path '/usr/var' -prune -o \
+		-path '/usr/misc' -prune -o \
+		-path '/sources' -prune -o \
+		-path '/tools' -prune -o \
+		-print > ${INDEX_FILE}
+}
+
+# This function will create a log file that will contain all the newly
+# installed files on the system. Perform this by creating a diff on the two
+# index files, then parsing the diff file for the lines designating the
+# newly installed files. Executing a diff on before (1st argument) and
+# after (2nd argument) will cause each line of the diff beginning with a
+# '>' to be a new file - this is what will be logged.
+function create_install_log {
+	diff ${BEFORE_INDEX} ${AFTER_INDEX} | \
+		sed -e '/^[0-9]/d' | sed -e 's/> //' | sed -e '/^<.*/d'
+}
+
+# A function to print usage information
+function usage {
+	echo "Usage: pinst [-h] [-a after_file -b before_file] [-c index_file]"
+	echo "  -a <file>       Specify the file to be read in as the 'After'"
+	echo "                  index file. This file should be the index"
+	echo "                  file created after the package was installed."
+	echo "  -b <file>       Specify the file to be read in as the 'Before'"
+	echo "                  index file. This file should be the index"
+	echo "                  file created before the package was installed."
+	echo "  -c <file>       Option to specify the creation of an index"
+	echo "                  file. This simply creates a listing of all the"
+	echo "                  files on the system (excluding variable data"
+	echo "                  directories."
+	echo "  -h              Display help test (what you are reading now)."
+	echo "To use this program you need to follow these steps:"
+	echo "  1) Create an index file before you install a given package"
+	echo "     (the before index file)."
+	echo "  2) Install a single package."
+	echo "  3) Create another index file (the after index file)."
+	echo "  4) Run this program specifying the before and after files with"
+	echo "     the -b and -a options respectively."
+	echo "This will output a listing of the newly installed files to"
+	echo "stdout."
+}
+
+##############################
+# Parse command-line options #
+##############################
+
+# parse the command-line options
+while getopts ":a:b:c:h" opt; do
+    case $opt in
+		a  ) AFTER_INDEX="${OPTARG}";;
+		b  ) BEFORE_INDEX="${OPTARG}";;
+		c  ) INDEX_FILE="${OPTARG}"
+			 create_index_file       # Set output file name
+			 exit 0;;
+		h  ) usage                 # Display help info (usage)
+			 exit 0;;
+		\? ) usage
+			 exit 1;;
+    esac
+done
+
+shift $(($OPTIND - 1))
+
+# Check to see if {BEFORE,AFTER}_INDEX variables are set. If they both are
+# then we call the function to create the log filr of the installed files.
+if [ "${AFTER_INDEX}" != "" ] && [ "${BEFORE_INDEX}" != "" ]; then
+	create_install_log
+else
+	echo "error: You must specify both an 'after' and 'before' file"
+	usage
+	exit 1
+fi
